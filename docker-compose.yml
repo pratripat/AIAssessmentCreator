@@ -1,0 +1,29 @@
+# docker-compose.yml (in project root)
+
+version: '3.8'
+
+services:
+
+  mongo:
+    image: mongo:7          # pulls official MongoDB image from Docker Hub
+    container_name: veda-mongo
+    ports:
+      - "27017:27017"       # host:container — your Express connects to localhost:27017
+    volumes:
+      - mongo-data:/data/db # persists data even when container restarts
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+
+  redis:
+    image: redis:7-alpine   # alpine = smaller image, same functionality
+    container_name: veda-redis
+    ports:
+      - "6379:6379"         # default Redis port
+    volumes:
+      - redis-data:/data    # optional: persist Redis data on restart
+    command: redis-server --appendonly yes  # enables persistence (AOF)
+
+volumes:
+  mongo-data:   # named volume — Docker manages where this lives on disk
+  redis-data:
