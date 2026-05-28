@@ -12,7 +12,29 @@ import paperRoutes from './routes/papers';
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// --- STRICT PRODUCTION CORS CONFIGURATION ---
+const allowedOrigins = [
+    'http://localhost:3000', // Local Next.js / React dev
+    'https://ai-assessment-creator-lilac.vercel.app' // Your live Vercel frontend
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow server-to-server or tools like Postman/Insomnia (no origin header)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
+    credentials: true, // Absolutely mandatory if you handle auth headers, tokens, or cookies
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+}));
+
 app.use(express.json());
 
 // routes
@@ -20,8 +42,12 @@ app.use('/api/assignments', assignmentRoutes);
 app.use('/api/papers', paperRoutes);
 
 app.get('/health', async (req, res) => {
-    const redisStatus = await redis.ping();
-    res.json({ status: 'ok', redis: redisStatus });
+    try {
+        const redisStatus = await redis.ping();
+        res.json({ status: 'ok', database: 'connected', redis: redisStatus });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: err.message });
+    }
 });
 
 // create http server (needed to share with WebSocket)
