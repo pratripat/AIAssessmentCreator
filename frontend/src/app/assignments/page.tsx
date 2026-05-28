@@ -35,23 +35,26 @@ export default function AssignmentsPage() {
     };
   }, []);
 
-  // ONLY show fullscreen loader on first load
+  // ONLY show fullscreen loader on first load (Styled safely for both light and dark backgrounds)
   if (loading && assignments.length === 0) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-[#F6F6F7] dark:bg-[#0F0F0F] transition-colors duration-200">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[#EA580C] border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <AssignmentsList
-      initialAssignments={assignments}
-      onDelete={(id) =>
-        setAssignments((prev) =>
-          prev.filter((a) => a._id !== id)
-        )
-      }
-    />
+    // Added dark:bg-[#0F0F0F] here to remove the hardcoded light block overlay
+    <div className="bg-[#F6F6F7] dark:bg-[#0F0F0F] transition-colors duration-200">
+      <AssignmentsList
+        initialAssignments={assignments}
+        onDelete={(id) =>
+          setAssignments((prev) =>
+            prev.filter((a) => a._id !== id)
+          )
+        }
+      />
+    </div>
   );
 }

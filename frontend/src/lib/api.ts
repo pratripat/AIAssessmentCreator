@@ -28,3 +28,7 @@ export const getPaper = async (assignmentId: string): Promise<Paper> => {
     const res = await api.get(`/api/papers/${assignmentId}`);
     return res.data.data;
 };
+
+export const regeneratePaper = async (assignmentId: string): Promise<void> => {
+    await api.post(`/api/papers/${assignmentId}/regenerate`);
+};
