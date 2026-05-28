@@ -83,7 +83,7 @@ const buildPrompt = (assignment: IAssignment, pdfText: string): string => {
   
   OTHER RULES:
   - difficulty must be exactly "Easy", "Moderate", or "Challenging"
-  - Distribute difficulty: roughly 30% Easy, 50% Moderate, 20% Challenging
+  - Distribute difficulty: roughly 30% Easy, 50% Moderate, 20% Challenging (Do follow any additional instructions over this if given any)
   - Questions must be relevant to the subject and class level
   - Each section maps to one question type
   - answerKey must have an entry for every question across all sections

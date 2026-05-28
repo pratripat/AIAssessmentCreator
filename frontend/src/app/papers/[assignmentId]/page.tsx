@@ -1,8 +1,9 @@
 'use client';
+
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Download, ArrowLeft, RefreshCw } from 'lucide-react';
-import { getPaper } from '@/lib/api';
+import { getPaper, regeneratePaper } from '@/lib/api';
 import { Paper } from '@/types';
 import { wsClient } from '@/lib/websocket';
 
@@ -13,25 +14,14 @@ export default function PaperPage() {
     const [status, setStatus] = useState<'loading' | 'processing' | 'done' | 'failed'>('loading');
 
     useEffect(() => {
-        // connect websocket
         wsClient.connect();
-
-        // listen for job updates
         const unsub = wsClient.onMessage((msg) => {
             if (msg.assignmentId !== assignmentId) return;
-
-            if (msg.type === 'JOB_COMPLETED') {
-                fetchPaper();
-            } else if (msg.type === 'JOB_FAILED') {
-                setStatus('failed');
-            } else if (msg.type === 'JOB_STARTED') {
-                setStatus('processing');
-            }
+            if (msg.type === 'JOB_COMPLETED') fetchPaper();
+            else if (msg.type === 'JOB_FAILED') setStatus('failed');
+            else if (msg.type === 'JOB_STARTED') setStatus('processing');
         });
-
-        // try fetching immediately (might already be done)
         fetchPaper();
-
         return () => unsub();
     }, [assignmentId]);
 
@@ -41,31 +31,29 @@ export default function PaperPage() {
             setPaper(data);
             setStatus('done');
         } catch {
-            // paper not ready yet — worker is still processing
             setStatus('processing');
         }
     };
 
     if (status === 'loading' || status === 'processing') {
         return (
-            <div className="flex flex-col items-center justify-center h-screen gap-4">
-                <div className="w-10 h-10 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm text-gray-500">
-                    {status === 'loading' ? 'Loading paper...' : 'AI is generating your question paper...'}
-                </p>
-                <p className="text-xs text-gray-400">This usually takes 10–20 seconds</p>
+            <div className="flex h-screen flex-col items-center justify-center bg-[#F7F7F8] dark:bg-[#0F0F0F] gap-5 font-['Inter']">
+                <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-[#111111] dark:border-white border-t-transparent" />
+                <div className="text-center">
+                    <p className="text-[15px] font-medium text-[#202020] dark:text-white">
+                        {status === 'loading' ? 'Loading paper...' : 'AI is generating your question paper...'}
+                    </p>
+                    <p className="mt-1 text-[13px] text-[#8A8A8A] dark:text-[#555]">This usually takes 10–20 seconds</p>
+                </div>
             </div>
         );
     }
 
     if (status === 'failed') {
         return (
-            <div className="flex flex-col items-center justify-center h-screen gap-4">
-                <p className="text-red-500 font-medium">Generation failed</p>
-                <button
-                    onClick={() => router.back()}
-                    className="text-sm text-gray-600 underline"
-                >
+            <div className="flex h-screen flex-col items-center justify-center bg-[#F7F7F8] dark:bg-[#0F0F0F] gap-4 font-['Inter']">
+                <p className="text-[16px] font-semibold text-red-500">Generation failed</p>
+                <button onClick={() => router.back()} className="text-sm text-[#666] dark:text-[#888] underline">
                     Go back and try again
                 </button>
             </div>
@@ -75,32 +63,28 @@ export default function PaperPage() {
     if (!paper) return null;
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
-            {/* Action bar */}
-            <div className="max-w-3xl mx-auto mb-4 flex items-center justify-between">
-                <button
-                    onClick={() => router.back()}
-                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
-                >
+        <div className="min-h-screen bg-[#F5F5F6] dark:bg-[#0F0F0F] px-6 py-6 font-['Inter']">
+            {/* Action Bar */}
+            <div className="mx-auto mb-5 flex max-w-[980px] items-center justify-between">
+                <button onClick={() => router.back()}
+                    className="flex items-center gap-2 text-[14px] font-medium text-[#666] dark:text-[#888] transition hover:text-black dark:hover:text-white">
                     <ArrowLeft size={16} />
                     Back
                 </button>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                     <button
-                        onClick={() => {
+                        onClick={async () => {
                             setStatus('processing');
                             setPaper(null);
-                            fetchPaper();
+                            await regeneratePaper(assignmentId as string);
                         }}
-                        className="flex items-center gap-2 border border-gray-300 px-4 py-2 rounded-full text-sm hover:bg-gray-100 transition-colors"
+                        className="flex h-[42px] items-center gap-2 rounded-full border border-[#E7E7E7] dark:border-[#2a2a2a] bg-white dark:bg-[#141414] px-5 text-[14px] font-medium text-[#333] dark:text-[#ccc] shadow-sm transition hover:bg-[#F7F7F7] dark:hover:bg-[#1f1f1f]"
                     >
                         <RefreshCw size={14} />
                         Regenerate
                     </button>
-                    <button
-                        onClick={() => window.print()}
-                        className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-full text-sm hover:bg-gray-700 transition-colors"
-                    >
+                    <button onClick={() => window.print()}
+                        className="flex h-[42px] items-center gap-2 rounded-full bg-[#111111] dark:bg-white dark:text-black px-5 text-[14px] font-medium text-white shadow-lg transition hover:opacity-90">
                         <Download size={14} />
                         Download as PDF
                     </button>
@@ -110,78 +94,76 @@ export default function PaperPage() {
             {/* Paper */}
             <div
                 id="paper-content"
-                className="max-w-3xl mx-auto bg-white border border-gray-200 rounded-2xl p-10 print:rounded-none print:border-none print:p-8"
+                className="mx-auto max-w-[980px] rounded-[28px] border border-[#E9E9E9] dark:border-[#2a2a2a] bg-white dark:bg-[#141414] px-14 py-12 shadow-[0_8px_30px_rgba(0,0,0,0.04)] print:rounded-none print:border-none print:shadow-none"
             >
-                {/* School header */}
-                <div className="text-center mb-6 border-b border-gray-200 pb-6">
-                    <h1 className="text-xl font-bold text-gray-900">{paper.schoolName}</h1>
-                    <p className="text-sm text-gray-600 mt-1">Subject: {paper.subject}</p>
-                    <p className="text-sm text-gray-600">Class: {paper.className}</p>
+                {/* School Header */}
+                <div className="mb-10 text-center">
+                    <h1 className="text-[34px] font-semibold tracking-[-0.03em] text-[#1A1A1A] dark:text-white">
+                        {paper.schoolName}
+                    </h1>
+                    <div className="mt-3 space-y-1">
+                        <p className="text-[17px] font-medium text-[#333] dark:text-[#ccc]">Subject: {paper.subject}</p>
+                        <p className="text-[17px] font-medium text-[#333] dark:text-[#ccc]">Class: {paper.className}</p>
+                    </div>
                 </div>
 
-                {/* Meta row */}
-                <div className="flex items-center justify-between mb-4 text-sm text-gray-700">
+                {/* Meta */}
+                <div className="mb-6 flex items-center justify-between text-[14px] font-medium text-[#303030] dark:text-[#aaa]">
                     <span>Time Allowed: {paper.timeAllowed}</span>
                     <span>Maximum Marks: {paper.maximumMarks}</span>
                 </div>
 
-                {/* General instruction */}
-                <p className="text-sm text-gray-700 mb-4 italic">{paper.generalInstruction}</p>
+                {/* Instruction */}
+                <p className="mb-8 text-[14px] text-[#444] dark:text-[#888]">{paper.generalInstruction}</p>
 
-                {/* Student info */}
-                <div className="flex flex-col gap-2 mb-8 text-sm text-gray-700">
+                {/* Student Info */}
+                <div className="mb-12 space-y-3 text-[14px] text-[#222] dark:text-[#ccc]">
                     <div className="flex items-center gap-2">
                         <span>Name:</span>
-                        <span className="border-b border-gray-400 w-48 inline-block" />
+                        <span className="inline-block w-48 border-b border-[#666] dark:border-[#444]" />
                     </div>
                     <div className="flex items-center gap-2">
                         <span>Roll Number:</span>
-                        <span className="border-b border-gray-400 w-36 inline-block" />
+                        <span className="inline-block w-36 border-b border-[#666] dark:border-[#444]" />
                     </div>
                     <div className="flex items-center gap-2">
-                        <span>Class: {paper.className} &nbsp; Section:</span>
-                        <span className="border-b border-gray-400 w-24 inline-block" />
+                        <span>Class: {paper.className} Section:</span>
+                        <span className="inline-block w-24 border-b border-[#666] dark:border-[#444]" />
                     </div>
                 </div>
 
                 {/* Sections */}
                 {paper.sections.map((section) => (
-                    <div key={section.sectionLabel} className="mb-8">
-                        <h2 className="text-base font-bold text-gray-900 mb-1">
+                    <div key={section.sectionLabel} className="mb-12">
+                        <h2 className="mb-6 text-center text-[28px] font-semibold tracking-[-0.02em] text-[#1E1E1E] dark:text-white">
                             Section {section.sectionLabel}
                         </h2>
-                        <h3 className="text-sm font-semibold text-gray-700 mb-1">{section.title}</h3>
-                        <p className="text-xs text-gray-500 italic mb-4">{section.instruction}</p>
+                        <h3 className="text-[18px] font-semibold text-[#222] dark:text-[#ddd]">{section.title}</h3>
+                        <p className="mt-1 mb-6 text-[13px] italic text-[#777] dark:text-[#555]">{section.instruction}</p>
 
-                        <div className="space-y-4">
+                        <div className="space-y-5">
                             {section.questions.map((question) => (
-                                <div key={question.questionNumber} className="flex gap-3">
-                                    <span className="text-sm font-medium text-gray-700 shrink-0 w-6">
+                                <div key={question.questionNumber} className="flex gap-4">
+                                    <span className="w-6 shrink-0 pt-[1px] text-[15px] font-medium text-[#333] dark:text-[#aaa]">
                                         {question.questionNumber}.
                                     </span>
                                     <div className="flex-1">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <p className="text-sm text-gray-800">{question.text}</p>
-                                            <div className="flex items-center gap-2 shrink-0">
-                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${question.difficulty === 'Easy'
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : question.difficulty === 'Moderate'
-                                                            ? 'bg-yellow-100 text-yellow-700'
-                                                            : 'bg-red-100 text-red-700'
-                                                    }`}>
-                                                    {question.difficulty}
-                                                </span>
-                                                <span className="text-xs text-gray-500 shrink-0">
-                                                    [{question.marks} Mark{question.marks > 1 ? 's' : ''}]
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Options for MCQ / True-False */}
+                                        <p className="text-[15px] leading-7 text-[#242424] dark:text-[#ddd]">
+                                            <span className={`font-medium ${question.difficulty === 'Easy' ? 'text-green-600 dark:text-green-400' :
+                                                    question.difficulty === 'Moderate' ? 'text-yellow-600 dark:text-yellow-400' :
+                                                        'text-red-600 dark:text-red-400'
+                                                }`}>
+                                                [{question.difficulty}]
+                                            </span>{' '}
+                                            {question.text}{' '}
+                                            <span className="text-[#666] dark:text-[#555]">
+                                                [{question.marks} Mark{question.marks > 1 ? 's' : ''}]
+                                            </span>
+                                        </p>
                                         {question.options && question.options.length > 0 && (
-                                            <div className="mt-2 grid grid-cols-2 gap-1">
+                                            <div className="mt-3 grid grid-cols-2 gap-2">
                                                 {question.options.map((option, i) => (
-                                                    <p key={i} className="text-sm text-gray-700">{option}</p>
+                                                    <p key={i} className="text-[14px] text-[#444] dark:text-[#888]">{option}</p>
                                                 ))}
                                             </div>
                                         )}
@@ -192,31 +174,33 @@ export default function PaperPage() {
                     </div>
                 ))}
 
-                <p className="text-sm font-semibold text-gray-700 mt-8 mb-6">End of Question Paper</p>
+                <p className="mt-10 mb-10 text-[15px] font-semibold text-[#222] dark:text-[#ddd]">
+                    End of Question Paper
+                </p>
 
                 {/* Answer Key */}
-                <div className="border-t border-gray-200 pt-6">
-                    <h2 className="text-base font-bold text-gray-900 mb-4">Answer Key:</h2>
-                    <div className="space-y-3">
+                <div className="border-t border-[#E8E8E8] dark:border-[#2a2a2a] pt-8">
+                    <h2 className="mb-6 text-[26px] font-semibold tracking-[-0.02em] text-[#1A1A1A] dark:text-white">
+                        Answer Key:
+                    </h2>
+                    <div className="space-y-5">
                         {paper.answerKey.map((item) => (
-                            <div key={item.questionNumber} className="flex gap-3 text-sm">
-                                <span className="font-medium text-gray-700 shrink-0 w-6">
+                            <div key={item.questionNumber} className="flex gap-4">
+                                <span className="w-6 shrink-0 text-[15px] font-medium text-[#333] dark:text-[#aaa]">
                                     {item.questionNumber}.
                                 </span>
-                                <p className="text-gray-600">{item.answer}</p>
+                                <p className="text-[14px] leading-7 text-[#444] dark:text-[#888]">{item.answer}</p>
                             </div>
                         ))}
                     </div>
                 </div>
             </div>
 
-            {/* Print styles */}
             <style jsx global>{`
         @media print {
           body * { visibility: hidden; }
           #paper-content, #paper-content * { visibility: visible; }
-          #paper-content { position: absolute; left: 0; top: 0; width: 100%; }
-          .print\\:hidden { display: none; }
+          #paper-content { position: absolute; left: 0; top: 0; width: 100%; padding: 40px; }
         }
       `}</style>
         </div>

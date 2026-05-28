@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import Paper from '../models/Paper';
+import { redis } from '../lib/redis';
+import { paperQueue } from '../lib/queue';
 
 const router = Router();
 
@@ -23,6 +25,26 @@ router.get('/:assignmentId', async (req: Request, res: Response) => {
         res.json({ success: true, data: paper });
     } catch (err) {
         res.status(500).json({ success: false, error: 'Failed to fetch paper' });
+    }
+});
+
+// POST regenerate
+router.post('/:assignmentId/regenerate', async (req: Request, res: Response) => {
+    try {
+        const { assignmentId } = req.params;
+
+        // 1. delete old paper
+        await Paper.deleteOne({ assignmentId });
+
+        // 2. clear Redis cache
+        await redis.del(`paper:${assignmentId}`);
+
+        // 3. queue new generation job
+        await paperQueue.add('generate', { assignmentId });
+
+        res.json({ success: true, message: 'Regeneration started' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Failed to regenerate' });
     }
 });
 

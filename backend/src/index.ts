@@ -1,11 +1,9 @@
-// backend/src/index.ts
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import http from 'http';
 import { connectDB } from './lib/db';
 import { redis } from './lib/redis';
-import { paperQueue } from './lib/queue';
 import { initWebSocket } from './lib/websocket';
 import { startWorker } from './workers/paperWorker';
 import assignmentRoutes from './routes/assignments';
